@@ -1,11 +1,20 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "Users")
 public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int userId;
+
     private String email;
     private String password;
     private String role;
     private String name;
+
+    @Column(name = "phone")
     private String phoneNumber;
 
     public User() {
@@ -81,9 +90,11 @@ public class User {
         return "User [userId=" + userId + ", email=" + email + ", role=" + role + ", name=" + name + "]";
     }
 
-    // Temporary fields for registration
-    private String businessName;
-    private String gstin;
+    // Temporary fields for registration - Not in Users table
+    @Transient
+    private String businessName; // stored in Sellers table manually for now
+    @Transient
+    private String gstin; // stored in Sellers table manually for now
 
     public String getBusinessName() {
         return businessName;

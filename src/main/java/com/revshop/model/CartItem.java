@@ -1,12 +1,23 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "CartItems")
 public class CartItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int cartItemId;
+
     private int cartId;
+
+    @Column(name = "productId")
     private int productId;
+
     private int quantity;
 
-
+    @ManyToOne
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
     private Product product;
 
     public CartItem() {

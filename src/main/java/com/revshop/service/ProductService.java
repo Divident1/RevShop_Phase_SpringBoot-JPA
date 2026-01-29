@@ -1,45 +1,89 @@
 package com.revshop.service;
 
-import com.revshop.dao.ProductDAO;
 import com.revshop.model.Product;
+import com.revshop.repository.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
+@Service
 public class ProductService {
-    private ProductDAO productDAO = new ProductDAO();
+
+    @Autowired
+    private ProductRepository productRepository;
 
     public boolean addProduct(Product product) {
         if (product.getDiscountedPrice() > product.getMrp()) {
             System.out.println("Error: Discounted price cannot be greater than MRP.");
             return false;
         }
-        return productDAO.addProduct(product);
+        try {
+            productRepository.save(product);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public List<Product> getAllProducts() {
-        return productDAO.getAllProducts();
+        return productRepository.findAll();
     }
 
     public List<Product> getProductsBySeller(int sellerId) {
-        return productDAO.getProductsBySeller(sellerId);
+        return productRepository.findBySellerId(sellerId);
     }
 
     public List<Product> searchProducts(String query) {
-        return productDAO.searchProducts(query);
+        return productRepository.findByNameContainingIgnoreCase(query);
     }
 
     public List<Product> searchByCategory(int categoryId) {
-        return productDAO.searchByCategory(categoryId);
+        return productRepository.findByCategoryId(categoryId);
     }
 
+    /**
+     * Updates an existing product.
+     * Checks if the discounted price is valid (must be <= MRP).
+     * 
+     * @param product The product with updated details.
+     * @return true if update is successful, false otherwise.
+     */
+    @Transactional
     public boolean updateProduct(Product product) {
+        // Business Logic: Validate price integrity
         if (product.getDiscountedPrice() > product.getMrp()) {
             System.out.println("Error: Discounted price cannot be greater than MRP.");
             return false;
         }
-        return productDAO.updateProduct(product);
+        try {
+            // Check existence before update to prevent phantom saves if using save() on new
+            // ID
+            if (productRepository.existsById(product.getProductId())) {
+                productRepository.save(product);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public boolean deleteProduct(int productId, int sellerId) {
-        return productDAO.deleteProduct(productId, sellerId);
+        try {
+            // Check if product exists and belongs to seller
+            Product p = productRepository.findById(productId).orElse(null);
+            if (p != null && p.getSellerId() == sellerId) {
+                productRepository.deleteById(productId);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

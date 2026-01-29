@@ -1,7 +1,14 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "Products")
 public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int productId;
+
     private int sellerId;
     private int categoryId;
     private String name;
@@ -39,7 +46,6 @@ public class Product {
         this.quantity = quantity;
         this.threshold = threshold;
     }
-
 
     public int getProductId() {
         return productId;

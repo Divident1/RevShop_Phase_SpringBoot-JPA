@@ -1,9 +1,15 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
 import java.sql.Timestamp;
 
+@Entity
+@Table(name = "Orders")
 public class Order {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int orderId;
+
     private int buyerId;
     private Timestamp orderDate;
     private double totalAmount;

@@ -1,41 +1,52 @@
 package com.revshop.ui;
 
-import com.revshop.dao.FavoriteDAO;
-import com.revshop.dao.NotificationDAO;
-import com.revshop.dao.ReviewDAO;
 import com.revshop.model.*;
+import com.revshop.repository.FavoriteRepository;
+import com.revshop.repository.NotificationRepository;
+import com.revshop.repository.ProductRepository;
+import com.revshop.repository.ReviewRepository;
 import com.revshop.service.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
+@Component
 public class ConsoleUI {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleUI.class);
     private Scanner scanner;
+
+    @Autowired
     private UserService userService;
+    @Autowired
     private ProductService productService;
+    @Autowired
     private CartService cartService;
+    @Autowired
     private OrderService orderService;
-    private ReviewDAO reviewDAO;
-    private FavoriteDAO favoriteDAO;
-    private NotificationDAO notificationDAO;
+    @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private ReviewRepository reviewRepository;
+    @Autowired
+    private FavoriteRepository favoriteRepository;
+    @Autowired
+    private NotificationRepository notificationRepository;
+    @Autowired
+    private ProductRepository productRepository;
+
     private User currentUser = null;
 
-    public ConsoleUI(UserService userService, ProductService productService, CartService cartService,
-            OrderService orderService, ReviewDAO reviewDAO, FavoriteDAO favoriteDAO,
-            NotificationDAO notificationDAO, CategoryService categoryService) {
+    public ConsoleUI() {
         this.scanner = new Scanner(System.in);
-        this.userService = userService;
-        this.productService = productService;
-        this.cartService = cartService;
-        this.orderService = orderService;
-        this.reviewDAO = reviewDAO;
-        this.favoriteDAO = favoriteDAO;
-        this.notificationDAO = notificationDAO;
-        this.categoryService = categoryService;
     }
 
     public void run() {
@@ -53,6 +64,9 @@ public class ConsoleUI {
                 } else if ("SELLER".equalsIgnoreCase(currentUser.getRole())) {
                     showSellerMenu();
                 }
+            } catch (java.util.NoSuchElementException e) {
+                log.info("Input stream closed. Exiting.");
+                break;
             } catch (Exception e) {
                 log.error("Error", e);
                 System.out.println("Something went wrong. Try again.");
@@ -147,13 +161,14 @@ public class ConsoleUI {
             currentUser = user;
             System.out.println("Welcome, " + user.getName() + "!");
 
-            List<Notification> notifs = notificationDAO.getUnreadNotifications(user.getUserId());
+            List<Notification> notifs = notificationRepository.findByUserIdAndIsReadFalse(user.getUserId());
             if (!notifs.isEmpty()) {
                 System.out.println("\n🔔 " + notifs.size() + " new notification(s):");
                 for (Notification n : notifs) {
                     System.out.println(" - " + n.getMessage());
+                    n.setRead(true);
                 }
-                notificationDAO.markAsRead(user.getUserId());
+                notificationRepository.saveAll(notifs);
             }
         } else {
             System.out.println("Invalid credentials.");
@@ -269,7 +284,7 @@ public class ConsoleUI {
         System.out.println("Price: Rs." + p.getDiscountedPrice() + " (MRP: " + p.getMrp() + ")");
         System.out.println("Stock: " + p.getQuantity());
 
-        List<Review> reviews = reviewDAO.getReviewsByProduct(p.getProductId());
+        List<Review> reviews = reviewRepository.findByProductId(p.getProductId());
         System.out.println("\nReviews (" + reviews.size() + "):");
         for (Review r : reviews)
             System.out.println("- " + r);
@@ -281,15 +296,17 @@ public class ConsoleUI {
         if (c == 1) {
             System.out.print("Qty: ");
             cartService.addToCart(currentUser.getUserId(), p.getProductId(), getInt());
-            System.out.println("Added to cart!");
         } else if (c == 2) {
             System.out.print("Rating (1-5): ");
             int rating = getInt();
             System.out.print("Comment: ");
-            reviewDAO.addReview(new Review(p.getProductId(), currentUser.getUserId(), rating, scanner.nextLine()));
+            Review review = new Review(p.getProductId(), currentUser.getUserId(), rating, scanner.nextLine());
+            review.setReviewDate(new Timestamp(System.currentTimeMillis()));
+            reviewRepository.save(review);
             System.out.println("Review added!");
         } else if (c == 3) {
-            if (favoriteDAO.addFavorite(currentUser.getUserId(), p.getProductId())) {
+            if (!favoriteRepository.existsByUserIdAndProductId(currentUser.getUserId(), p.getProductId())) {
+                favoriteRepository.save(new Favorite(currentUser.getUserId(), p.getProductId()));
                 System.out.println("Added to favorites!");
             } else {
                 System.out.println("Already in favorites!");
@@ -306,11 +323,38 @@ public class ConsoleUI {
                 return;
             }
             double total = 0;
+            // Fetch product logic if needed, but CartItem entity might have loaded it if we
+            // fetched correctly
+            // CartService calls cartItemRepo.findByCartId.
+            // My CartItem mapped Product with @ManyToOne.
+            // Assuming JPA fetches it.
+
             for (CartItem item : items) {
-                double price = item.getProduct().getDiscountedPrice();
+                // If product is null, we might need to fetch manually, but let's assume JPA
+                // mapping works or we patch it.
+                // To be safe, let's fetch product details if product object is null (which
+                // happens if I used @Transient or simple mapping).
+                // I used @ManyToOne... private Product product;
+                // If items are returned from JPA repo, product should be populated.
+
+                String pName = "Unknown";
+                double pPrice = 0;
+
+                if (item.getProduct() != null) {
+                    pName = item.getProduct().getName();
+                    pPrice = item.getProduct().getDiscountedPrice();
+                } else {
+                    // Fallback if mapping failed/lazy load issue outside transaction
+                    Product p = productRepository.findById(item.getProductId()).orElse(null);
+                    if (p != null) {
+                        pName = p.getName();
+                        pPrice = p.getDiscountedPrice();
+                    }
+                }
+
                 System.out.printf("PID:%d | %s | Qty:%d | Rs.%.2f\n",
-                        item.getProductId(), item.getProduct().getName(), item.getQuantity(), price);
-                total += price * item.getQuantity();
+                        item.getProductId(), pName, item.getQuantity(), pPrice);
+                total += pPrice * item.getQuantity();
             }
             System.out.printf("Total: Rs.%.2f\n", total);
 
@@ -339,7 +383,6 @@ public class ConsoleUI {
         int pid = getInt();
         System.out.print("Qty: ");
         cartService.addToCart(currentUser.getUserId(), pid, getInt());
-        System.out.println("Added to cart!");
     }
 
     private void checkout() {
@@ -355,7 +398,7 @@ public class ConsoleUI {
 
         System.out.println("\nPayment: 1.Credit 2.Debit 3.UPI");
         System.out.print("Choice: ");
-        scanner.nextLine();
+        scanner.nextLine(); // consume leftover
 
         System.out.println("Processing payment...");
         try {
@@ -373,7 +416,7 @@ public class ConsoleUI {
 
     private void viewOrderHistory() {
         System.out.println("\n--- Orders ---");
-        List<Order> orders = orderService.getOrderHistory(currentUser.getUserId());
+        List<Order> orders = orderService.getOrdersByBuyer(currentUser.getUserId());
         if (orders.isEmpty())
             System.out.println("No orders.");
         else
@@ -383,12 +426,16 @@ public class ConsoleUI {
 
     private void viewFavorites() {
         System.out.println("\n--- My Favorites ---");
-        List<Product> favs = favoriteDAO.getFavoriteProducts(currentUser.getUserId());
+        List<Favorite> favs = favoriteRepository.findByUserId(currentUser.getUserId());
         if (favs.isEmpty()) {
             System.out.println("No favorites found.");
             return;
         }
-        for (Product p : favs) {
+
+        List<Integer> pids = favs.stream().map(Favorite::getProductId).collect(Collectors.toList());
+        List<Product> products = productRepository.findAllById(pids);
+
+        for (Product p : products) {
             System.out.printf("ID:%d | %s | Rs.%.2f\n",
                     p.getProductId(), p.getName(), p.getDiscountedPrice());
         }
@@ -399,7 +446,8 @@ public class ConsoleUI {
         if (c == 1) {
             System.out.print("Product ID to remove: ");
             int pid = getInt();
-            if (favoriteDAO.removeFavorite(currentUser.getUserId(), pid)) {
+            if (favoriteRepository.existsByUserIdAndProductId(currentUser.getUserId(), pid)) {
+                favoriteRepository.deleteById(new FavoriteId(currentUser.getUserId(), pid));
                 System.out.println("Removed!");
             } else {
                 System.out.println("Failed/Not found.");
@@ -571,7 +619,7 @@ public class ConsoleUI {
             System.out.println("Invalid ID.");
             return;
         }
-        List<Review> reviews = reviewDAO.getReviewsByProduct(pid);
+        List<Review> reviews = reviewRepository.findByProductId(pid);
         if (reviews.isEmpty())
             System.out.println("No reviews.");
         else {

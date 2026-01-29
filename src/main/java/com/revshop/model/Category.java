@@ -1,7 +1,14 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "Categories")
 public class Category {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int categoryId;
+
     private String name;
 
     public Category() {

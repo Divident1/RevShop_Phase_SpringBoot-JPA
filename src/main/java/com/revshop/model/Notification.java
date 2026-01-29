@@ -1,9 +1,15 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
 import java.sql.Timestamp;
 
+@Entity
+@Table(name = "Notifications")
 public class Notification {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int notificationId;
+
     private int userId;
     private String message;
     private boolean isRead;

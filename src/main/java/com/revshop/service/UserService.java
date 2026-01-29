@@ -1,60 +1,98 @@
 package com.revshop.service;
 
-import com.revshop.dao.UserDAO;
 import com.revshop.model.User;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.revshop.repository.UserRepository;
+import com.revshop.util.LoggerUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
+@Service
 public class UserService {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-    private UserDAO userDAO = new UserDAO();
+    @Autowired
+    private UserRepository userRepository;
 
+    @Transactional
     public boolean registerUser(User user) {
         if (user.getEmail() == null || !user.getEmail().contains("@")) {
-            logger.warn("Invalid email: {}", user.getEmail());
+            LoggerUtil.warn("Invalid email: {}", user.getEmail());
             return false;
         }
         if (user.getPassword() == null || user.getPassword().length() < 6) {
-            logger.warn("Password too short");
+            LoggerUtil.warn("Password too short");
             return false;
         }
         String role = user.getRole();
         if (role == null || (!role.equalsIgnoreCase("BUYER") && !role.equalsIgnoreCase("SELLER"))) {
-            logger.warn("Invalid role: {}", role);
+            LoggerUtil.warn("Invalid role: {}", role);
             return false;
         }
-        return userDAO.registerUser(user);
+
+        if (userRepository.existsByEmail(user.getEmail())) {
+            LoggerUtil.warn("Email already exists: {}", user.getEmail());
+            return false;
+        }
+
+        try {
+            userRepository.save(user);
+            LoggerUtil.info("User registered: {}", user.getEmail());
+            return true;
+        } catch (Exception e) {
+            LoggerUtil.error("Registration error", e);
+            return false;
+        }
     }
 
     public User loginUser(String email, String password) {
         if (email == null || password == null)
             return null;
-        return userDAO.loginUser(email, password);
+
+        Optional<User> userOpt = userRepository.findByEmailAndPassword(email, password);
+        if (userOpt.isPresent()) {
+            LoggerUtil.info("Login success: {}", email);
+            return userOpt.get();
+        } else {
+            LoggerUtil.warn("Login failed: {}", email);
+            return null;
+        }
     }
 
+    @Transactional
     public boolean changePassword(String email, String oldPassword, String newPassword) {
-        User user = userDAO.loginUser(email, oldPassword);
-        if (user == null) {
-            logger.warn("Wrong old password for {}", email);
+        Optional<User> userOpt = userRepository.findByEmailAndPassword(email, oldPassword);
+        if (userOpt.isEmpty()) {
+            LoggerUtil.warn("Wrong old password for {}", email);
             return false;
         }
         if (newPassword == null || newPassword.length() < 6) {
-            logger.warn("New password too short");
+            LoggerUtil.warn("New password too short");
             return false;
         }
-        return userDAO.updatePassword(email, newPassword);
+
+        User user = userOpt.get();
+        user.setPassword(newPassword);
+        userRepository.save(user);
+        return true;
     }
 
+    @Transactional
     public boolean resetPassword(String email, String newPassword) {
-        if (!userDAO.emailExists(email)) {
-            logger.warn("Email not found: {}", email);
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            LoggerUtil.warn("Email not found: {}", email);
             return false;
         }
         if (newPassword == null || newPassword.length() < 6) {
-            logger.warn("New password too short");
+            LoggerUtil.warn("New password too short");
             return false;
         }
-        return userDAO.updatePassword(email, newPassword);
+
+        User user = userOpt.get();
+        user.setPassword(newPassword);
+        userRepository.save(user); // JPA detects change on managed entity
+        return true;
     }
 }

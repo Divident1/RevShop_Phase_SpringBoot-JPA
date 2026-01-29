@@ -1,71 +1,114 @@
 package com.revshop.service;
 
-import com.revshop.dao.CartDAO;
-import com.revshop.dao.OrderDAO;
-import com.revshop.dao.ProductDAO;
-import com.revshop.dao.NotificationDAO;
-import com.revshop.model.CartItem;
-import com.revshop.model.Order;
-import com.revshop.util.DBUtil;
+import com.revshop.model.*;
+import com.revshop.repository.NotificationRepository;
+import com.revshop.repository.OrderItemRepository;
+import com.revshop.repository.OrderRepository;
+import com.revshop.repository.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Connection;
-import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 
+@Service
 public class OrderService {
-    private CartDAO cartDAO = new CartDAO();
-    private OrderDAO orderDAO = new OrderDAO();
-    private ProductDAO productDAO = new ProductDAO();
-    private NotificationDAO notificationDAO = new NotificationDAO();
 
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private CartService cartService;
+
+    @Transactional
     public boolean placeOrder(int buyerId, String shippingAddress) {
-        List<CartItem> cartItems = cartDAO.getCartItems(buyerId);
+        List<CartItem> cartItems = cartService.getCartItems(buyerId);
         if (cartItems.isEmpty()) {
             System.out.println("Cart is empty!");
             return false;
         }
 
         double totalAmount = 0;
+
+        // Re-fetch product to get price and stock
+        // Actually, let's iterate and sum up.
         for (CartItem item : cartItems) {
-            totalAmount += item.getProduct().getDiscountedPrice() * item.getQuantity();
+            Product p = productRepository.findById(item.getProductId()).orElse(null);
+            if (p == null || p.getQuantity() < item.getQuantity()) {
+                System.out.println("Product not available: " + item.getProductId());
+                return false;
+            }
+            totalAmount += p.getDiscountedPrice() * item.getQuantity();
         }
 
         Order order = new Order();
         order.setBuyerId(buyerId);
         order.setTotalAmount(totalAmount);
         order.setShippingAddress(shippingAddress);
+        order.setOrderDate(new Timestamp(System.currentTimeMillis()));
+        order.setStatus("Placed");
 
-        int orderId = orderDAO.createOrder(order);
-        if (orderId != -1) {
-            for (CartItem item : cartItems) {
-                orderDAO.createOrderItem(orderId, item.getProductId(), item.getQuantity(),
-                        item.getProduct().getDiscountedPrice());
+        Order savedOrder = orderRepository.save(order);
+        int orderId = savedOrder.getOrderId();
 
-                // Critical Fix: Deduct stock
-                boolean stockUpdated = productDAO.updateProductStock(item.getProductId(), item.getQuantity());
-                if (!stockUpdated) {
-                    System.out.println("Warning: Failed to update stock for Product ID: " + item.getProductId());
-                }
+        for (CartItem item : cartItems) {
+            Product p = productRepository.findById(item.getProductId()).orElseThrow();
 
-                // Notify Seller
-                notificationDAO.sendNotification(item.getProduct().getSellerId(),
-                        "New Order #" + orderId + " received for product: " + item.getProduct().getName());
-            }
+            OrderItem orderItem = new OrderItem(orderId, item.getProductId(), item.getQuantity(),
+                    p.getDiscountedPrice());
+            orderItemRepository.save(orderItem);
 
-            // Notify Buyer
-            notificationDAO.sendNotification(buyerId, "Order #" + orderId + " placed successfully!");
+            // Deduct stock
+            p.setQuantity(p.getQuantity() - item.getQuantity());
+            productRepository.save(p);
 
-            cartDAO.clearCart(buyerId);
+            // Notify Seller
+            Notification notif = new Notification(p.getSellerId(),
+                    "New Order #" + orderId + " received for product: " + p.getName());
+            notif.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+            notificationRepository.save(notif);
+        }
+
+        // Notify Buyer
+        Notification buyerNotif = new Notification(buyerId, "Order #" + orderId + " placed successfully!");
+        buyerNotif.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+        notificationRepository.save(buyerNotif);
+
+        cartService.clearCart(buyerId);
+        return true;
+    }
+
+    public List<Order> getOrdersByBuyer(int buyerId) {
+        return orderRepository.findByBuyerId(buyerId);
+    }
+
+    @Transactional
+    public boolean updateOrderStatus(int orderId, String status) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order != null) {
+            order.setStatus(status);
+            orderRepository.save(order);
+            // Notify buyer
+            Notification notif = new Notification(order.getBuyerId(),
+                    "Order #" + orderId + " status updated to: " + status);
+            notif.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+            notificationRepository.save(notif);
             return true;
         }
         return false;
     }
 
-    public List<Order> getOrderHistory(int buyerId) {
-        return orderDAO.getOrdersByBuyer(buyerId);
-    }
-
     public List<Order> getOrdersForSeller(int sellerId) {
-        return orderDAO.getOrdersBySeller(sellerId);
+        return orderRepository.findOrdersBySellerId(sellerId);
     }
 }

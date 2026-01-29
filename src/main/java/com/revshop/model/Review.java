@@ -1,9 +1,15 @@
 package com.revshop.model;
 
+import jakarta.persistence.*;
 import java.sql.Timestamp;
 
+@Entity
+@Table(name = "Reviews")
 public class Review {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int reviewId;
+
     private int productId;
     private int userId;
     private int rating;
