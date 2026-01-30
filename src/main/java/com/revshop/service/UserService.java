@@ -4,6 +4,7 @@ import com.revshop.model.User;
 import com.revshop.repository.UserRepository;
 import com.revshop.util.LoggerUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,9 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Transactional
     public boolean registerUser(User user) {
         if (user.getEmail() == null || !user.getEmail().contains("@")) {
@@ -25,9 +29,8 @@ public class UserService {
             LoggerUtil.warn("Password too short");
             return false;
         }
-        String role = user.getRole();
-        if (role == null || (!role.equalsIgnoreCase("BUYER") && !role.equalsIgnoreCase("SELLER"))) {
-            LoggerUtil.warn("Invalid role: {}", role);
+        if (user.getRole() == null) {
+            LoggerUtil.warn("Role is required");
             return false;
         }
 
@@ -37,6 +40,10 @@ public class UserService {
         }
 
         try {
+            // Hash password before saving
+            String encodedPassword = passwordEncoder.encode(user.getPassword());
+            user.setPassword(encodedPassword);
+
             userRepository.save(user);
             LoggerUtil.info("User registered: {}", user.getEmail());
             return true;
@@ -50,30 +57,44 @@ public class UserService {
         if (email == null || password == null)
             return null;
 
-        Optional<User> userOpt = userRepository.findByEmailAndPassword(email, password);
+        // Fetch by Email only
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
         if (userOpt.isPresent()) {
-            LoggerUtil.info("Login success: {}", email);
-            return userOpt.get();
-        } else {
-            LoggerUtil.warn("Login failed: {}", email);
-            return null;
+            User user = userOpt.get();
+            // Verify password using BCrypt
+            if (passwordEncoder.matches(password, user.getPassword())) {
+                LoggerUtil.info("Login success: {}", email);
+                return user;
+            }
         }
+
+        LoggerUtil.warn("Login failed: {}", email);
+        return null;
     }
 
     @Transactional
     public boolean changePassword(String email, String oldPassword, String newPassword) {
-        Optional<User> userOpt = userRepository.findByEmailAndPassword(email, oldPassword);
+        // Fetch by Email only
+        Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
+            LoggerUtil.warn("User not found: {}", email);
+            return false;
+        }
+
+        User user = userOpt.get();
+        // Verify old password
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             LoggerUtil.warn("Wrong old password for {}", email);
             return false;
         }
+
         if (newPassword == null || newPassword.length() < 6) {
             LoggerUtil.warn("New password too short");
             return false;
         }
 
-        User user = userOpt.get();
-        user.setPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         return true;
     }
@@ -91,7 +112,7 @@ public class UserService {
         }
 
         User user = userOpt.get();
-        user.setPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user); // JPA detects change on managed entity
         return true;
     }

@@ -9,9 +9,17 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int userId;
 
+    @Column(nullable = false, unique = true)
     private String email;
+
+    @Column(nullable = false)
     private String password;
-    private String role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    @Column(nullable = false)
     private String name;
 
     @Column(name = "phone")
@@ -20,7 +28,7 @@ public class User {
     public User() {
     }
 
-    public User(int userId, String email, String password, String role, String name, String phoneNumber) {
+    public User(int userId, String email, String password, Role role, String name, String phoneNumber) {
         this.userId = userId;
         this.email = email;
         this.password = password;
@@ -29,7 +37,7 @@ public class User {
         this.phoneNumber = phoneNumber;
     }
 
-    public User(String email, String password, String role, String name, String phoneNumber) {
+    public User(String email, String password, Role role, String name, String phoneNumber) {
         this.email = email;
         this.password = password;
         this.role = role;
@@ -61,11 +69,11 @@ public class User {
         this.password = password;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 

@@ -11,8 +11,13 @@ public class Product {
 
     private int sellerId;
     private int categoryId;
+    @Column(nullable = false)
     private String name;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(nullable = false)
     private double mrp;
     private double discountedPrice;
     private int quantity;

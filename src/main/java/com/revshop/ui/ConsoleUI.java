@@ -59,9 +59,9 @@ public class ConsoleUI {
             try {
                 if (currentUser == null) {
                     showMainMenu();
-                } else if ("BUYER".equalsIgnoreCase(currentUser.getRole())) {
+                } else if (currentUser.getRole() == Role.BUYER) {
                     showBuyerMenu();
-                } else if ("SELLER".equalsIgnoreCase(currentUser.getRole())) {
+                } else if (currentUser.getRole() == Role.SELLER) {
                     showSellerMenu();
                 }
             } catch (java.util.NoSuchElementException e) {
@@ -126,16 +126,26 @@ public class ConsoleUI {
         System.out.print("Phone: ");
         String phone = scanner.nextLine();
         System.out.print("Role (BUYER/SELLER): ");
-        String role = scanner.nextLine().toUpperCase();
+        System.out.print("Role (1. BUYER, 2. SELLER): ");
+        int roleChoice = getInt();
+        Role role = null;
+        if (roleChoice == 1)
+            role = Role.BUYER;
+        else if (roleChoice == 2)
+            role = Role.SELLER;
+        else {
+            System.out.println("Invalid role selected.");
+            return;
+        }
 
-        if (!role.equals("BUYER") && !role.equals("SELLER")) {
+        if (role == null) {
             System.out.println("Invalid role.");
             return;
         }
 
         User user = new User(email, password, role, name, phone);
 
-        if (role.equals("SELLER")) {
+        if (role == Role.SELLER) {
             System.out.print("Business Name: ");
             user.setBusinessName(scanner.nextLine());
             System.out.print("GSTIN: ");
