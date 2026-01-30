@@ -3,8 +3,8 @@ package com.revshop.service;
 import com.revshop.model.User;
 import com.revshop.repository.UserRepository;
 import com.revshop.util.LoggerUtil;
+import com.revshop.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +15,6 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Transactional
     public boolean registerUser(User user) {
@@ -41,9 +38,7 @@ public class UserService {
 
         try {
             // Hash password before saving
-            String encodedPassword = passwordEncoder.encode(user.getPassword());
-            user.setPassword(encodedPassword);
-
+            user.setPassword(PasswordUtil.hash(user.getPassword()));
             userRepository.save(user);
             LoggerUtil.info("User registered: {}", user.getEmail());
             return true;
@@ -62,8 +57,8 @@ public class UserService {
 
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            // Verify password using BCrypt
-            if (passwordEncoder.matches(password, user.getPassword())) {
+            // Verify password using PasswordUtil
+            if (PasswordUtil.check(password, user.getPassword())) {
                 LoggerUtil.info("Login success: {}", email);
                 return user;
             }
@@ -84,7 +79,7 @@ public class UserService {
 
         User user = userOpt.get();
         // Verify old password
-        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+        if (!PasswordUtil.check(oldPassword, user.getPassword())) {
             LoggerUtil.warn("Wrong old password for {}", email);
             return false;
         }
@@ -94,7 +89,7 @@ public class UserService {
             return false;
         }
 
-        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPassword(PasswordUtil.hash(newPassword));
         userRepository.save(user);
         return true;
     }
@@ -112,7 +107,7 @@ public class UserService {
         }
 
         User user = userOpt.get();
-        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPassword(PasswordUtil.hash(newPassword));
         userRepository.save(user); // JPA detects change on managed entity
         return true;
     }
