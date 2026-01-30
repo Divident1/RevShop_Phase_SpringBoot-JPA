@@ -12,6 +12,12 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private Seller seller;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private Buyer buyer;
+
     @Column(nullable = false)
     private String password;
 
@@ -91,6 +97,26 @@ public class User {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public Seller getSeller() {
+        return seller;
+    }
+
+    public void setSeller(Seller seller) {
+        this.seller = seller;
+        if (seller != null)
+            seller.setUser(this);
+    }
+
+    public Buyer getBuyer() {
+        return buyer;
+    }
+
+    public void setBuyer(Buyer buyer) {
+        this.buyer = buyer;
+        if (buyer != null)
+            buyer.setUser(this);
     }
 
     @Override

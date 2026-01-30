@@ -3,7 +3,6 @@ package com.revshop.service;
 import com.revshop.model.Role;
 import com.revshop.model.User;
 import com.revshop.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

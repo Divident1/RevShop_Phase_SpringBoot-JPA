@@ -39,7 +39,20 @@ public class UserService {
         try {
             // Hash password before saving
             user.setPassword(PasswordUtil.hash(user.getPassword()));
-            userRepository.save(user);
+
+            // Create related entity based on role
+            if (user.getRole() == com.revshop.model.Role.SELLER) {
+                com.revshop.model.Seller seller = new com.revshop.model.Seller();
+                seller.setBusinessName(user.getBusinessName());
+                seller.setGstin(user.getGstin());
+                // Helper method handles bidirectional link
+                user.setSeller(seller);
+            } else if (user.getRole() == com.revshop.model.Role.BUYER) {
+                com.revshop.model.Buyer buyer = new com.revshop.model.Buyer();
+                user.setBuyer(buyer);
+            }
+
+            userRepository.save(user); // Cascades to Seller/Buyer
             LoggerUtil.info("User registered: {}", user.getEmail());
             return true;
         } catch (Exception e) {

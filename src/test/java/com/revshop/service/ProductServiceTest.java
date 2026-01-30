@@ -10,10 +10,9 @@ public class ProductServiceTest {
 
     @Test
     public void testDiscountedPriceValidation() {
-        // Discounted price > MRP should fail
+        // Discounted price > MRP should throw IllegalArgumentException
         Product invalidProduct = new Product(1, 1, "Test", "Desc", 100.0, 150.0, 10, 5);
-        boolean result = productService.addProduct(invalidProduct);
-        assertFalse(result, "Product with discounted price > MRP should fail");
+        assertThrows(IllegalArgumentException.class, () -> productService.addProduct(invalidProduct));
     }
 
     @Test
@@ -27,7 +26,6 @@ public class ProductServiceTest {
     @Test
     public void testUpdateProductValidation() {
         Product invalidProduct = new Product(1, 1, 1, "Test", "Desc", 50.0, 100.0, 10, 5);
-        boolean result = productService.updateProduct(invalidProduct);
-        assertFalse(result, "Update with discounted price > MRP should fail");
+        assertThrows(IllegalArgumentException.class, () -> productService.updateProduct(invalidProduct));
     }
 }

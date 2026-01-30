@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -538,10 +537,12 @@ public class ConsoleUI {
         int catId = getInt();
 
         Product p = new Product(currentUser.getUserId(), catId, name, desc, mrp, price, qty, threshold);
-        if (productService.addProduct(p))
+        try {
+            productService.addProduct(p);
             System.out.println("Product added!");
-        else
-            System.out.println("Failed to add product.");
+        } catch (Exception e) {
+            System.out.println("Failed to add product: " + e.getMessage());
+        }
     }
 
     private void viewMyProducts() {
@@ -587,19 +588,23 @@ public class ConsoleUI {
         int catId = getInt();
 
         Product p = new Product(pid, currentUser.getUserId(), catId, name, desc, mrp, price, qty, threshold);
-        if (productService.updateProduct(p))
+        try {
+            productService.updateProduct(p);
             System.out.println("Updated!");
-        else
-            System.out.println("Update failed.");
+        } catch (Exception e) {
+            System.out.println("Update failed: " + e.getMessage());
+        }
     }
 
     private void deleteProduct() {
         System.out.print("Product ID: ");
         int pid = getInt();
-        if (productService.deleteProduct(pid, currentUser.getUserId()))
+        try {
+            productService.deleteProduct(pid, currentUser.getUserId());
             System.out.println("Deleted!");
-        else
-            System.out.println("Delete failed.");
+        } catch (Exception e) {
+            System.out.println("Delete failed: " + e.getMessage());
+        }
     }
 
     private void viewMyOrders() {

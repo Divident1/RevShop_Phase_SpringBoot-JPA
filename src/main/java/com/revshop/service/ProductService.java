@@ -14,18 +14,11 @@ public class ProductService {
     @Autowired
     private ProductRepository productRepository;
 
-    public boolean addProduct(Product product) {
+    public Product addProduct(Product product) {
         if (product.getDiscountedPrice() > product.getMrp()) {
-            System.out.println("Error: Discounted price cannot be greater than MRP.");
-            return false;
+            throw new IllegalArgumentException("Discounted price cannot be greater than MRP.");
         }
-        try {
-            productRepository.save(product);
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
+        return productRepository.save(product);
     }
 
     public List<Product> getAllProducts() {
@@ -49,41 +42,31 @@ public class ProductService {
      * Checks if the discounted price is valid (must be <= MRP).
      * 
      * @param product The product with updated details.
-     * @return true if update is successful, false otherwise.
+     * @return The updated product.
      */
     @Transactional
-    public boolean updateProduct(Product product) {
+    public Product updateProduct(Product product) {
         // Business Logic: Validate price integrity
         if (product.getDiscountedPrice() > product.getMrp()) {
-            System.out.println("Error: Discounted price cannot be greater than MRP.");
-            return false;
+            throw new IllegalArgumentException("Discounted price cannot be greater than MRP.");
         }
-        try {
-            // Check existence before update to prevent phantom saves if using save() on new
-            // ID
-            if (productRepository.existsById(product.getProductId())) {
-                productRepository.save(product);
-                return true;
-            }
-            return false;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+
+        // Check existence before update
+        if (!productRepository.existsById(product.getProductId())) {
+            throw new com.revshop.exception.ResourceNotFoundException(
+                    "Product not found with ID: " + product.getProductId());
         }
+        return productRepository.save(product);
     }
 
-    public boolean deleteProduct(int productId, int sellerId) {
-        try {
-            // Check if product exists and belongs to seller
-            Product p = productRepository.findById(productId).orElse(null);
-            if (p != null && p.getSellerId() == sellerId) {
-                productRepository.deleteById(productId);
-                return true;
-            }
-            return false;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+    public void deleteProduct(int productId, int sellerId) {
+        Product p = productRepository.findById(productId)
+                .orElseThrow(() -> new com.revshop.exception.ResourceNotFoundException(
+                        "Product not found with ID: " + productId));
+
+        if (p.getSellerId() != sellerId) {
+            throw new IllegalArgumentException("Product does not belong to this seller.");
         }
+        productRepository.deleteById(productId);
     }
 }

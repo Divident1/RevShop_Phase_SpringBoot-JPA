@@ -8,7 +8,7 @@ public class PasswordUtil {
     private static final PasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private PasswordUtil() {
-        // Private constructor
+
     }
 
     /**
@@ -21,13 +21,6 @@ public class PasswordUtil {
         return encoder.encode(plainPassword);
     }
 
-    /**
-     * Checks if a plain text password matches a hashed password.
-     * 
-     * @param plainPassword  The plain text password.
-     * @param hashedPassword The existing hashed password.
-     * @return true if matches, false otherwise.
-     */
     public static boolean check(String plainPassword, String hashedPassword) {
         return encoder.matches(plainPassword, hashedPassword);
     }
